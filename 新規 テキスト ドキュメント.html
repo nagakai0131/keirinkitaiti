@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>競輪EVツール</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+
+body{
+font-family:-apple-system,BlinkMacSystemFont;
+background:#f2f2f7;
+margin:0;
+padding:15px;
+}
+
+.title{
+font-size:22px;
+font-weight:bold;
+text-align:center;
+margin-bottom:10px;
+}
+
+.card{
+background:white;
+border-radius:14px;
+padding:15px;
+margin-bottom:15px;
+box-shadow:0 2px 6px rgba(0,0,0,0.08);
+}
+
+.symbol-row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin:6px 0;
+}
+
+.symbol{
+font-size:22px;
+width:40px;
+}
+
+input{
+width:70px;
+height:40px;
+font-size:18px;
+text-align:center;
+border-radius:8px;
+border:1px solid #ccc;
+}
+
+button{
+width:100%;
+height:50px;
+font-size:18px;
+border:none;
+border-radius:12px;
+margin-top:10px;
+}
+
+.generate{
+background:#007aff;
+color:white;
+}
+
+.calc{
+background:#34c759;
+color:white;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+}
+
+td,th{
+padding:6px;
+text-align:center;
+font-size:14px;
+}
+
+th{
+color:#666;
+}
+
+.row{
+border-bottom:1px solid #eee;
+}
+
+.good{
+background:#ffe5e5;
+}
+
+.best{
+background:#ffb3b3;
+font-weight:bold;
+}
+
+.odds-row{
+display:flex;
+justify-content:space-between;
+margin:5px 0;
+}
+
+.pair{
+width:70px;
+font-weight:bold;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="title">競輪 期待値ツール</div>
+
+<div class="card">
+
+<div class="symbol-row">
+<div class="symbol">◎</div>
+<input inputmode="numeric" id="g">
+</div>
+
+<div class="symbol-row">
+<div class="symbol">〇</div>
+<input inputmode="numeric" id="o">
+</div>
+
+<div class="symbol-row">
+<div class="symbol">▲</div>
+<input inputmode="numeric" id="a">
+</div>
+
+<div class="symbol-row">
+<div class="symbol">△</div>
+<input inputmode="numeric" id="d">
+</div>
+
+<div class="symbol-row">
+<div class="symbol">×</div>
+<input inputmode="numeric" id="x">
+</div>
+
+<button class="generate" onclick="generate()">組合せ生成</button>
+
+</div>
+
+<div class="card" id="oddsCard" style="display:none">
+<div id="odds"></div>
+<button class="calc" onclick="calc()">期待値計算</button>
+</div>
+
+<div class="card" id="resultCard" style="display:none">
+<div id="result"></div>
+</div>
+
+<script>
+
+const score={
+"◎":0.57,
+"〇":0.49,
+"▲":0.36,
+"△":0.20,
+"×":0.17
+}
+
+const defaultScore=0.08
+
+let combos=[]
+
+function generate(){
+
+combos=[]
+
+let sym={
+"◎":g.value.trim(),
+"〇":o.value.trim(),
+"▲":a.value.trim(),
+"△":d.value.trim(),
+"×":x.value.trim()
+}
+
+let used=[]
+
+for(let s in sym){
+if(sym[s]!="") used.push(sym[s])
+}
+
+let all=["1","2","3","4","5","6","7"]
+
+let missing=all.filter(n=>!used.includes(n)).slice(0,2)
+
+let combined=[]
+
+for(let s in sym){
+if(sym[s]!="") combined.push([s,sym[s]])
+}
+
+missing.forEach(n=>{
+combined.push(["無",n])
+})
+
+combined.sort((a,b)=>Number(a[1])-Number(b[1]))
+
+let html="<h3>オッズ入力</h3>"
+
+for(let i=0;i<combined.length;i++){
+
+for(let j=i+1;j<combined.length;j++){
+
+let a=combined[i]
+let b=combined[j]
+
+let pair=a[1]+"-"+b[1]
+
+combos.push({
+sym1:a[0],
+sym2:b[0],
+pair:pair
+})
+
+if(a[0]=="無"||b[0]=="無") continue
+
+html+=`
+<div class="odds-row">
+<div class="pair">${pair} (${a[0]}${b[0]})</div>
+<input inputmode="decimal" id="odds_${pair}">
+</div>
+`
+
+}
+
+}
+
+odds.innerHTML=html
+oddsCard.style.display="block"
+
+}
+
+function calc(){
+
+let rows=[]
+
+combos.forEach(c=>{
+
+let el=document.getElementById("odds_"+c.pair)
+
+if(!el) return
+
+let odds=parseFloat(el.value)
+
+if(!odds) return
+
+let s1=score[c.sym1]||defaultScore
+let s2=score[c.sym2]||defaultScore
+
+let win=0.5*s1*s2
+let ev=win*odds
+
+rows.push({
+pair:c.pair,
+sym:c.sym1+c.sym2,
+win:win,
+odds:odds,
+ev:ev
+})
+
+})
+
+rows.sort((a,b)=>b.ev-a.ev)
+
+let html="<table>"
+html+="<tr><th>車番</th><th>記号</th><th>勝率</th><th>オッズ</th><th>EV</th></tr>"
+
+rows.forEach((r,i)=>{
+
+let cls="row"
+
+if(r.ev>=1) cls+=" good"
+if(i==0) cls+=" best"
+
+html+=`
+<tr class="${cls}">
+<td>${r.pair}</td>
+<td>${r.sym}</td>
+<td>${r.win.toFixed(4)}</td>
+<td>${r.odds}</td>
+<td>${r.ev.toFixed(2)}</td>
+</tr>
+`
+
+})
+
+html+="</table>"
+
+result.innerHTML=html
+resultCard.style.display="block"
+
+}
+
+</script>
+
+</body>
+</html>
